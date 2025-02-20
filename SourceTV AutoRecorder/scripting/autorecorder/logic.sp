@@ -27,6 +27,8 @@ char g_szDemoPath[PLATFORM_MAX_PATH];
 char g_szModFolder[PLATFORM_MAX_PATH];
 char g_szLevelName[PLATFORM_MAX_PATH];
 
+bool g_bConfigExecuted = false;
+
 bool HaveEnoughPlayers()
 {
     return Util_ClientsConnected(!sm_autorecord_ignorebots.BoolValue) >= sm_autorecord_minplayers.IntValue;
@@ -230,6 +232,11 @@ bool TryStartRecording(const char[] format, char[] error, int maxlength)
 
 void TryStartAutoRecording(const char[] reason)
 {
+    if (!g_bConfigExecuted)
+    {
+        return;
+    }
+
     if (!sm_autorecord_enable.BoolValue) {
         return;
     }
@@ -385,6 +392,7 @@ public void OnConfigsExecuted()
         SetFailState("SourceTV disabled!");
     }
 
+    g_bConfigExecuted = true;
     TryStartAutoRecording("Config executed");
 }
 
@@ -423,7 +431,7 @@ void Logic_Init()
 
     sm_autorecord_enable = CreateConVar("sm_autorecord_enable", "1", "Enable autorecording features");
 
-    sm_autorecord_minplayers = CreateConVar("sm_autorecord_minplayers", "1", "Minimum players required to allow demo recording");
+    sm_autorecord_minplayers = CreateConVar("sm_autorecord_minplayers", "2", "Minimum players required to allow demo recording");
     sm_autorecord_minplayersdelay = CreateConVar("sm_autorecord_minplayersdelay", "30.0", "Delay before stopping a demo, in seconds", FCVAR_NONE, true, 0.0, true, 300.0);
     sm_autorecord_ignorebots = CreateConVar("sm_autorecord_ignorebots", "1", "Ignore bots when counting players");
 

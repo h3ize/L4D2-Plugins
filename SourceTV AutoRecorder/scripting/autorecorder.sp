@@ -33,6 +33,12 @@ public void OnPluginStart()
     Console_Init();
 
     AutoExecConfig(true, "plugin.autorecorder");
+    g_bConfigExecuted = true;
+
+    if (g_bConfigExecuted)
+    {
+        TryStartAutoRecording("Plugin started");
+    }
 }
 
 public void OnAllPluginsLoaded()
