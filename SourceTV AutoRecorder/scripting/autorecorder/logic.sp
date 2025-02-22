@@ -1,3 +1,4 @@
+
 #include <@shqke/util/format>
 #include <@shqke/util/convars>
 #include <@shqke/util/files>
@@ -163,11 +164,6 @@ bool TryStartRecording(const char[] format, char[] error, int maxlength)
         char cvarfmt[PLATFORM_MAX_PATH];
         sm_autorecord_pathfmt.GetString(cvarfmt, sizeof(cvarfmt));
         pathlen = FormatPathString(path, sizeof(path), cvarfmt);
-    }
-
-    if (path[0] == '\0') {
-        // Form a path from default format
-        pathlen = FormatPathString(path, sizeof(path), "auto-%Y%m%d-%H%M%S-%l-%q");
     }
 
     if (pathlen == sizeof(path) - 1) {
