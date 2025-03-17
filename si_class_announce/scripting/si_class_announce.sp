@@ -18,7 +18,7 @@ public Plugin myinfo =
 {
     name = "Special Infected Class Announce [Translations Ver]",
     author = "Tabun, Forgetest, PaaNChaN, heize",
-    description = "Report what SI classes are up when the round starts.",
+    description = "Report what SI classes are up when the round starts AFTER boss percentage on footer.",
     version = PLUGIN_VERSION,
     url = "none"
 }
@@ -133,7 +133,7 @@ Action Timer_PluginStart(Handle timer)
 	if (g_hCvarFooter.BoolValue)
 	{
 		delete g_hAddFooterTimer;
-		g_hAddFooterTimer = CreateTimer(6.0, UpdateReadyUpFooter);
+		g_hAddFooterTimer = CreateTimer(7.0, UpdateReadyUpFooter);
 		CreateTimer(6.5, g_bAllowFooter_true, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 
