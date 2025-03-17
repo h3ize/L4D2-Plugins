@@ -12,7 +12,7 @@ public Plugin myinfo =
 {
     name = "[L4D2] Restore Blocked Vocalize",
     author = "Forgetest, heize",
-    description = "Annoyments outside TLS are back. (Admin flags ONLY)",
+    description = "Annoyments outside TLS are back.",
     version = PLUGIN_VERSION,
     url = "https://github.com/h3ize"
 };
@@ -26,30 +26,54 @@ ConVar g_cAdminFlag = null;
 
 public void OnPluginStart()
 {
-    AutoExecConfig_SetCreateFile(true);
-    AutoExecConfig_SetFile("tls_restore_vocalize.cfg");
+    AutoExecConfig_SetFile("tls_restore_vocalize");
 
-    g_cAdminFlag = AutoExecConfig_CreateConVar("tls_restore_vocalizer_flag", "z", "Admin flag required to access vocalize. (Recommend downloading Ion's Vocalizer, Extracting the files, then adding them to your script folder. https://steamcommunity.com/sharedfiles/filedetails/?id=698857882)", FCVAR_NONE);
+    g_cAdminFlag = AutoExecConfig_CreateConVar("tls_restore_vocalizer_flag", "", "Admin flag required to access vocalize. Leave empty to allow all players to use Laugh and Taunt vocalizers. (Recommend downloading Ion's Vocalizer, Extracting the files, then adding them to your script folder. https://steamcommunity.com/sharedfiles/filedetails/?id=698857882)", FCVAR_NONE);
 
     AutoExecConfig_ExecuteFile();
 
+    AutoExecConfig_CleanFile();
+
+    char adminFlagString[32];
+    GetConVarString(g_cAdminFlag, adminFlagString, sizeof(adminFlagString));
+
     Handle conf = LoadGameConfigFile(GAMEDATA_FILE);
     if (!conf)
-        SetFailState("Missing gamedata \""...GAMEDATA_FILE..."\"");
+    {
+        char errorMsg[128];
+        Format(errorMsg, sizeof(errorMsg), "Missing gamedata \"%s\"", GAMEDATA_FILE);
+        SetFailState(errorMsg);
+    }
 
     DynamicDetour hDetour = DynamicDetour.FromConf(conf, KEY_APPEND);
     if (!hDetour)
-        SetFailState("Missing detour setup for \""...KEY_APPEND..."\"");
+    {
+        char errorMsg[128];
+        Format(errorMsg, sizeof(errorMsg), "Missing detour setup for \"%s\"", KEY_APPEND);
+        SetFailState(errorMsg);
+    }
 
     if (!hDetour.Enable(Hook_Pre, DTR_OnModifyOrAppendCriteria_Pre) || !hDetour.Enable(Hook_Post, DTR_OnModifyOrAppendCriteria_Post))
-        SetFailState("Failed to detour \""...KEY_APPEND..."\"");
+    {
+        char errorMsg[128];
+        Format(errorMsg, sizeof(errorMsg), "Failed to detour \"%s\"", KEY_APPEND);
+        SetFailState(errorMsg);
+    }
 
     hDetour = DynamicDetour.FromConf(conf, KEY_GAMEMODE);
     if (!hDetour)
-        SetFailState("Missing detour setup for \""...KEY_GAMEMODE..."\"");
+    {
+        char errorMsg[128];
+        Format(errorMsg, sizeof(errorMsg), "Missing detour setup for \"%s\"", KEY_GAMEMODE);
+        SetFailState(errorMsg);
+    }
 
     if (!hDetour.Enable(Hook_Pre, DTR_OnGetGameModeBase_Pre))
-        SetFailState("Failed to detour \""...KEY_GAMEMODE..."\"");
+    {
+        char errorMsg[128];
+        Format(errorMsg, sizeof(errorMsg), "Failed to detour \"%s\"", KEY_GAMEMODE);
+        SetFailState(errorMsg);
+    }
 
     delete conf;
 
@@ -86,12 +110,18 @@ Action CmdLis_OnVocalize(int client, const char[] command, int argc)
                 char adminFlagString[32];
                 GetConVarString(g_cAdminFlag, adminFlagString, sizeof(adminFlagString));
 
+                if (StrEqual(adminFlagString, "", false))
+                {
+                    g_iActor = client;
+                    RequestFrame(OnNextFrame_ResetActor, GetClientUserId(client));
+                    return Plugin_Continue;
+                }
+
                 int requiredFlag = ReadFlagString(adminFlagString);
                 int clientFlags = GetUserFlagBits(client);
 
                 if ((clientFlags & requiredFlag) != requiredFlag && (clientFlags & ADMFLAG_ROOT) == 0)
                     return Plugin_Handled;
-
             }
 
             g_iActor = client;
@@ -101,7 +131,6 @@ Action CmdLis_OnVocalize(int client, const char[] command, int argc)
 
     return Plugin_Continue;
 }
-
 
 void OnNextFrame_ResetActor(int userid)
 {
