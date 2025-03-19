@@ -1,0 +1,1 @@
+Announce damage dealt to tanks by survivors.

@@ -1,0 +1,1 @@
+Admins are able to force change alltalk with just a command.

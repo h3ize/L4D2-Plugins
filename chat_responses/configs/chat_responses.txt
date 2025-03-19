@@ -1,0 +1,15 @@
+"ChatResponses"
+{
+	"!1"
+	{
+		"text"		"{blue} hello"
+	}
+	"!2"
+	{
+		"text"		"{red} hi"
+	}
+	"!3"
+	{
+		"text"		"{green} yo"
+	}
+}

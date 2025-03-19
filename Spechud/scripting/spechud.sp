@@ -19,6 +19,7 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 #include <l4d_tank_damage_announce>
+#include <autoexecconfig>
 
 /**
  * 1. tankhud 增加 Punches, Rocks, Props, Total Damage, alive Time:
@@ -29,7 +30,7 @@
 
 public Plugin myinfo =
 {
-	name = "Hyper-V HUD Manager",
+	name = "SpectatorHud (Hyper-V HUD Manager)",
 	author = "Visor, Forgetest, heize",
 	description = "Provides different HUDs for spectators",
 	version = PLUGIN_VERSION,
@@ -109,6 +110,8 @@ bool bSpecHudPersistent[MAXPLAYERS+1]; // New array to store persistent HUD stat
 // ======================================================================
 public void OnPluginStart()
 {
+    AutoExecConfig_SetFile("hyperv_hud_manager");
+
     LoadPluginTranslations();
 
     (survivor_limit = FindConVar("survivor_limit")).AddChangeHook(GameConVarChanged);
@@ -116,7 +119,7 @@ public void OnPluginStart()
     (sv_maxplayers = FindConVar("sv_maxplayers")).AddChangeHook(GameConVarChanged);
     (tank_burn_duration = FindConVar("tank_burn_duration")).AddChangeHook(GameConVarChanged);
 
-    auto_enable_spechud = CreateConVar("auto_enable_spechud", "1", "Automatically enable spechud for spectators", FCVAR_NONE);
+    auto_enable_spechud = AutoExecConfig_CreateConVar("auto_enable_spechud", "0", "Automatically enable spechud for spectators", FCVAR_NONE);
     if (auto_enable_spechud != null)
     {
         auto_enable_spechud.AddChangeHook(GameConVarChanged);
@@ -147,10 +150,13 @@ public void OnPluginStart()
         bSpecHudHintShown[i] = false;
         bTankHudActive[i] = true;
         bTankHudHintShown[i] = false;
-        bSpecHudPersistent[i] = true; // Initialize persistent HUD state
+        bSpecHudPersistent[i] = true;
     }
 
     CreateTimer(SPECHUD_DRAW_INTERVAL, HudDrawTimer, _, TIMER_REPEAT);
+
+    AutoExecConfig_ExecuteFile();
+    AutoExecConfig_CleanFile();
 }
 
 /**********************************************************************************************/
@@ -406,7 +412,6 @@ public void OnRoundIsLive()
         bFlowTankActive = bRoundHasFlowTank;
 
         bCustomBossSys = IsDarkCarniRemix();
-
         bStaticTank = bTankifier && IsStaticTankMap();
         bStaticWitch = bTankifier && IsStaticWitchMap();
 
@@ -474,7 +479,6 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (!client || !IsInfected(client)) return;
-
 	if (GetInfectedClass(client) == L4D2Infected_Tank)
 	{
 		if (iTankCount > 0) iTankCount--;
@@ -763,9 +767,7 @@ void FillSurvivorInfo(Panel hSpecHud)
 {
 	static char info[100];
 	static char name[MAX_NAME_LENGTH];
-
 	int SurvivorTeamIndex = GameRules_GetProp("m_bAreTeamsFlipped");
-
 	switch (g_Gamemode)
 	{
 		case GAMEMODE_SCAVENGE:
@@ -876,7 +878,7 @@ void FillScoreInfo(Panel hSpecHud)
 				fDuration = GetScavengeRoundDuration(!bTeamFlipped);
 				iMinutes = RoundToFloor(fDuration / 60);
 
-				FormatEx(info, sizeof(info), "> Opponent Duration [%02d:%05.2f]", iMinutes, fDuration - 60 * iMinutes);
+				FormatEx(info, sizeof(info), "> Opponent Duration [%02d:%02.0f]", iMinutes, fDuration - 60 * iMinutes);
 				DrawPanelText(hSpecHud, info);
 			}
 		}
@@ -1116,7 +1118,6 @@ bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
 		if(bl4d_tank_damage_announce)
 		{
 			static int Punch, Rock, Hittable, TotalDamage;
-
 			Punch=TFA_Punches(tank);
 			Rock=TFA_Rocks(tank);
 			Hittable=TFA_Hittables(tank);
@@ -1181,7 +1182,7 @@ bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
 		// Draw frustration
 		if (!IsFakeClient(tank))
 		{
-			FormatEx(info, sizeof(info), "Frustr.  : %d%% / %s%d:%s%d", GetTankFrustration(tank), (UpTime/60 < 10) ? "0" : "", (UpTime/60), (UpTime%60 < 10) ? "0" : "", UpTime%60);
+			FormatEx(info, sizeof(info), "Frustr.  : %d%% / %s%d:%s%d", GetTankFrustration(tank), (UpTime/60 < 10) ? "0" : "", (UpTime/60), (UpTime%60 < 0) ? "0" : "", UpTime%60);
 		}
 		else
 		{
