@@ -1,0 +1,1 @@
+An updated version of CanadaRox's plugin. Allows you to set a cvar to disable spectator command when the round ends, until the next map.

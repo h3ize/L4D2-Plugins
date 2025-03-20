@@ -13,7 +13,7 @@ new Handle:g_hSwitchMapTimer;
 public Plugin:myinfo =
 {
     name = "L4D2 Server Manager",
-    description = "Restarts server automatically when empty. Uses the built-in restart of srcds_run",
+    description = "Restarts server automatically when empty.",
     author = "heize",
     version = "1.0",
     url = "https://github.com/h3ize/"

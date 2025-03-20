@@ -1,0 +1,1 @@
+Give Admin flag access to uncapped Spectator rates instead of being locked at 30 ticks.

@@ -8,63 +8,12 @@
 #include <autoexecconfig>
 #include <logic/uservector>
 
-/**
- * 哈利修改
- * l4d_tank_damage_announce "3.4.3" 變體插件
- * 回合結束後依然保留數據 直到下回合開始
- */
-
-/*
-* Version 0.6.6
-* - Better looking Output.
-* - Added Tank Name display when Tank dies, normally it only showed the Tank's name if the Tank survived
-*
-* Version 0.6.6b
-* - Fixed Printing Two Tanks when last map Tank survived.
-* Added by; Sir
-
-* Version 0.6.7
-* - Added Campaign Difficulty Support.
-* Added by; Sir
-
-* Version 2.0
-* - Full support for multiple tanks.
-* - Merged with `l4d2_tank_facts_announce`
-* - DONE: Some style settings. (See Version 2.2)
-* @Forgetest
-
-* Version 2.1
-* - Added support to print names of AI Tank.
-* @Forgetest
-
-* Version 2.2
-* - Fixed no print when Tank dies to "world". (Thanks to @Alan)
-* - Fixed incorrect remaining health if Tank is full healthy. (Thanks to @nikita1824)
-* - Fixed death remaining unchanged if Survivor dies to anything else than Tank.
-* - Added another 3 text styles (one is disabling extra prints).
-* - Added a few natives written by @nikita1824.
-* @Forgetest
-
-* Version 2.3
-* - Fixed a case where there's no print if an AI as Tank is kicked. (Reported by @Alan)
-* - Added a variant to separate lines printing style. (Requested by @Alan)
-* - Added a new field "Index" to Tank info to indicate the number of Tank spawned on current map.
-* @Forgetest
-
-* Version 3.0
-* - Reworked "UserVector" and related codes.
-* - Replaced enums with enum structs.
-* - Fixed a few cases where damage is incorrect.
-* - Fixed not detecting manually spawned tanks.
-* @Forgetest
-*/
-
 #define PLUGIN_VERSION "3.4.3-2025/1/31"
 
 public Plugin myinfo =
 {
 	name = "Tank Damage Announce L4D2",
-	author = "Griffin and Blade, Sir, Forgetest",
+	author = "Griffin and Blade, Sir, Forgetest, heize",
 	description = "Announce damage dealt to tanks by survivors",
 	version = PLUGIN_VERSION,
 	url = "https://github.com/Target5150/MoYu_Server_Stupid_Plugins"
@@ -75,75 +24,67 @@ public Plugin myinfo =
 
 #define TEAM_SURVIVOR 2
 #define TEAM_INFECTED 3
-#define ZOMBIECLASS_TANK 8							// Zombie class of the tank, used to find tank after he have been passed to another player
+#define ZOMBIECLASS_TANK 8
 
 enum struct SurvivorInfo
 {
 	int userid;
-	int damageDone;				// Damage to Tank
-	int punch;					// Punch hits
-	int rock;					// Rock hits
-	int hittable;				// Hittable hits
-	int damageReceived;			// Damage from Tank
+	int damageDone;
+	int punch;
+	int rock;
+	int hittable;
+	int damageReceived;
 }
 
 enum struct TankInfo
 {
 	int userid;
-	int index;							// Serial number of Tanks spawned on this map
-	int incap;							// Total Survivor incaps
-	int death;							// Total Survivor death
-	int totalDamage;					// Total damage done to Survivors
-	float aliveSince;					// Initial spawn time
-	int lastHealth;						// Last HP after hit
+	int index;
+	int incap;
+	int death;
+	int totalDamage;
+	float aliveSince;
+	int lastHealth;
 	int maxHealth;
-	int lastControlUserid;				// Last human control
-	AutoUserVector survivorInfoVector;	// UserVector storing info described above
-	int friendlyDamage;					// Damage done by teammates (infected)
+	int lastControlUserid;
+	AutoUserVector survivorInfoVector;
+	int friendlyDamage;
 	int unknownDamage;
 }
-UserVector g_aTankInfo;		// Every Tank has a slot here along with relationships.
+UserVector g_aTankInfo;
 
-StringMap g_smUserNames;	// Simple map from userid to player names.
+StringMap g_smUserNames;
 
-int
-	g_iTankIndex;									// Used to index every Tank
+int g_iTankIndex;
 
-bool
-	g_bIsTankInPlay				= false;            // Whether or not the tank is active
+bool g_bIsTankInPlay = false;
 
 ConVar
-	g_hCvarEnabled				= null,
-	g_hCvarDebug				= null,
-	g_hCvarTopCount				= null,
-	g_hCvarSuppressTankDamage	= null;				// New ConVar to suppress tank damage messages in chat.
+	g_hCvarEnabled = null,
+	g_hCvarDebug = null,
+	g_hCvarTopCount = null,
+	g_hCvarSuppressTankDamage = null;
 
 enum
 {
 	Style_Nothing = 0,
-
 	STYLE_FACTS_BEGIN,
 	Style_Combined = 1,
-
 	STYLE_SEPARATE_REVERSE_BEGIN,
 	Style_Separate_Reverse = 2,
-
 	STYLE_SEPARATE_BEGIN,
 	Style_Separate = 3,
 	Stype_SeparateDelay = 4,
-
 	NUM_TEXT_STYLE
 }
-ConVar
-	g_hTextStyle				= null;
+ConVar g_hTextStyle = null;
 
 enum
 {
-	OTHERSOURCE_FRIENDLY		= 1,
-	OTHERSOURCE_UNKNOWN			= (1 << 1),
+	OTHERSOURCE_FRIENDLY = 1,
+	OTHERSOURCE_UNKNOWN = (1 << 1),
 };
-ConVar
-	g_hCvarOtherSource			= null;
+ConVar g_hCvarOtherSource = null;
 
 GlobalForward g_TankDanageAnnounceForward;
 
@@ -168,55 +109,21 @@ public void OnPluginStart()
 
 	AutoExecConfig_SetFile(CONFIG_FILE);
 
-	g_hCvarEnabled = AutoExecConfig_CreateConVar("l4d_tankdamage_enabled",
-										"1",
-										"Announce damage done to tanks when enabled",
-										FCVAR_NONE,
-										true, 0.0, true, 1.0);
-	g_hCvarDebug = AutoExecConfig_CreateConVar("l4d_tankdamage_debug",
-										"0",
-										"Debug toggler.",
-										FCVAR_NONE,
-										true, 0.0, true, 1.0);
-	g_hCvarTopCount = AutoExecConfig_CreateConVar("l4d_tankdamage_top_count",
-										"0",
-										"Print only top-numbered survivor damages."
-									...	"0 = print all survivor damages",
-										FCVAR_NONE,
-										true, 0.0, false, 0.0);
-	g_hCvarOtherSource = AutoExecConfig_CreateConVar("l4d_tankdamage_other_source",
-										"3",
-										"Announce damages from other source than survivors.\n"
-									...	"1 = Infected friendly damage\n"
-									...	"2 = Unknown source damage\n"
-									...	"3 = All.",
-										FCVAR_NONE,
-										true, 0.0, false, 0.0);
-	g_hTextStyle = AutoExecConfig_CreateConVar("l4d_tankdamage_text_style",
-										"2",
-										"Text style for how tank facts are printed.\n"
-									...	"0 = Nothing\n"
-									...	"1 = Combine with damage print\n"
-									...	"2 = Separate lines before damage print\n"
-									...	"3 = Separate lines after damage print\n"
-									...	"4 = Individually print with a delay.",
-										FCVAR_NONE,
-										true, 0.0, true, 4.0);
-
-	g_hCvarSuppressTankDamage = AutoExecConfig_CreateConVar("l4d_tankdamage_suppress_tank_damage",
-										"0",
-										"Suppress tank damage messages in chat.",
-										FCVAR_NONE,
-										true, 0.0, true, 1.0);
+	g_hCvarEnabled = AutoExecConfig_CreateConVar("l4d_tankdamage_enabled", "1", "Announce damage done to tanks when enabled", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hCvarDebug = AutoExecConfig_CreateConVar("l4d_tankdamage_debug", "0", "Debug toggler.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hCvarTopCount = AutoExecConfig_CreateConVar("l4d_tankdamage_top_count", "0", "Print only top-numbered survivor damages. 0 = print all survivor damages", FCVAR_NONE, true, 0.0, false, 0.0);
+	g_hCvarOtherSource = AutoExecConfig_CreateConVar("l4d_tankdamage_other_source", "3", "Announce damages from other source than survivors.\n1 = Infected friendly damage\n2 = Unknown source damage\n3 = All.", FCVAR_NONE, true, 0.0, false, 0.0);
+	g_hTextStyle = AutoExecConfig_CreateConVar("l4d_tankdamage_text_style", "2", "Text style for how tank facts are printed.\n0 = Nothing\n1 = Combine with damage print\n2 = Separate lines before damage print\n3 = Separate lines after damage print\n4 = Individually print with a delay.", FCVAR_NONE, true, 0.0, true, 4.0);
+	g_hCvarSuppressTankDamage = AutoExecConfig_CreateConVar("l4d_tankdamage_suppress_tank_damage", "0", "Suppress tank damage messages in chat.", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
 
 	HookEvent("round_start", Event_RoundStart);
-	HookEvent("round_end",				Event_RoundEnd,		EventHookMode_PostNoCopy); //trigger twice in versus/survival/scavenge mode, one when all survivors wipe out or make it to saferom, one when first round ends (second round_start begins).
-	HookEvent("map_transition", 		Event_RoundEnd,		EventHookMode_PostNoCopy); //all survivors make it to saferoom, and server is about to change next level in coop mode (does not trigger round_end)
-	HookEvent("mission_lost", 			Event_RoundEnd,		EventHookMode_PostNoCopy); //all survivors wipe out in coop mode (also triggers round_end)
-	HookEvent("finale_vehicle_leaving", Event_RoundEnd,		EventHookMode_PostNoCopy); //final map final rescue vehicle leaving  (does not trigger round_end)
+	HookEvent("round_end", Event_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("map_transition", Event_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("mission_lost", Event_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("finale_vehicle_leaving", Event_RoundEnd, EventHookMode_PostNoCopy);
 	HookEvent("player_bot_replace", Event_PlayerBotReplace);
 	HookEvent("bot_player_replace", Event_BotPlayerReplace);
 	HookEvent("tank_spawn", Event_TankSpawn);
@@ -229,9 +136,6 @@ public void OnPluginStart()
 	g_smUserNames = new StringMap();
 }
 
-/**
- * Rounds & Clients
- */
 public void OnClientDisconnect(int client)
 {
 	int userid = GetClientUserId(client);
@@ -279,7 +183,6 @@ public void L4D_OnReplaceTank(int tank, int newtank)
 	if (!tank || !newtank || tank == newtank)
 		return;
 
-	// This is a pre-hook so make sure the replace actually happens via a delayed check.
 	DataPack dp = new DataPack();
 	dp.WriteCell(GetClientUserId(tank));
 	dp.WriteCell(GetClientUserId(newtank));
@@ -329,8 +232,6 @@ void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 	if (!client || !IsClientInGame(client))
 		return;
 
-	//PrintToChatAll("Event_TankSpawn - %N", client);
-
 	++g_iTankIndex;
 
 	g_bIsTankInPlay = true;
@@ -342,11 +243,14 @@ void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 	g_aTankInfo.Set(userid, g_iTankIndex, TankInfo::index);
 
 	UpdateTankHealth(client);
+
+	// Check the ConVar and suppress tank damage messages if needed
+	if (g_hCvarSuppressTankDamage.BoolValue)
+	{
+		PrintToChatAll("Tank damage messages are suppressed for this Tank.");
+	}
 }
 
-/**
- * Game events
- */
 void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
 	if (!g_bIsTankInPlay)
@@ -378,9 +282,7 @@ void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 		if (IsIncapacitated(victim))
 			return;
 
-		if (attacker <= 0
-		 || attacker > MaxClients
-		 || !IsTank(attacker))
+		if (attacker <= 0 || attacker > MaxClients || !IsTank(attacker))
 			return;
 
 		int health = GetClientHealth(victim);
@@ -405,7 +307,7 @@ void Event_PlayerIncapStart(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerIncap(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bIsTankInPlay)			// No tank in play; no damage to record
+	if (!g_bIsTankInPlay)
 		return;
 
 	int victim = GetClientOfUserId(event.GetInt("userid"));
@@ -433,10 +335,10 @@ void Event_PlayerIncap(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerKilled(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bIsTankInPlay)			// No tank in play; no damage to record
+	if (!g_bIsTankInPlay)
 		return;
 
-	if (event.GetBool("abort"))		// A Tank replace is happening
+	if (event.GetBool("abort"))
 		return;
 
 	int victimid = event.GetInt("userid");
@@ -446,12 +348,8 @@ void Event_PlayerKilled(Event event, const char[] name, bool dontBroadcast)
 
 	PrintDebug("%s : %N", name, victim);
 
-	if (IsTank(victim))			// Victim isn't tank; no damage to record
+	if (IsTank(victim))
 	{
-		// Award the killing blow's damage to the attacker; we don't award
-		// damage from player_hurt after the tank has died/is dying
-		// If we don't do it this way, we get wonky/inaccurate damage values
-
 		int iTankLastHealth;
 		g_aTankInfo.Get(victimid, iTankLastHealth, TankInfo::lastHealth);
 
@@ -461,20 +359,14 @@ void Event_PlayerKilled(Event event, const char[] name, bool dontBroadcast)
 
 		OnTankTakeDamage(victim, attacker, iTankLastHealth);
 
-		// Damage announce could probably happen right here...
-		CreateTimer(0.1, Timer_CheckTank, victimid); // Use a delayed timer due to bugs where the tank passes to another player
+		CreateTimer(0.1, Timer_CheckTank, victimid);
 	}
 	else if (GetClientTeam(victim) == TEAM_SURVIVOR)
 	{
-		// Attack damage is handled in "Event_PlayerHurt",
-		// so handle death only.
 		OnSurvivorDeath(victim);
 	}
 }
 
-/**
- * Handler
- */
 void UpdateTankHealth(int tank)
 {
 	int tankid = GetClientUserId(tank);
@@ -482,9 +374,7 @@ void UpdateTankHealth(int tank)
 	g_aTankInfo.Set(tankid, GetEntProp(tank, Prop_Data, "m_iMaxHealth"), TankInfo::maxHealth);
 	g_aTankInfo.Set(tankid, GetClientHealth(tank), TankInfo::lastHealth);
 
-	PrintDebug("UpdateTankHealth : %N  %d / %d",
-				tank,
-				GetClientHealth(tank), GetEntProp(tank, Prop_Data, "m_iMaxHealth"));
+	PrintDebug("UpdateTankHealth : %N  %d / %d", tank, GetClientHealth(tank), GetEntProp(tank, Prop_Data, "m_iMaxHealth"));
 }
 
 void OnTankTakeDamage(int tank, int attacker, int damage)
@@ -584,9 +474,6 @@ void CheckTank(int userid)
 	}
 }
 
-/**
- * Print
- */
 bool FindTankControlName(int userid, char[] name, int maxlen)
 {
 	int client = GetClientOfUserId(userid);
@@ -616,18 +503,9 @@ void PrintTankDamageTitle(const TankInfo info)
 	Format(name, sizeof(name), "%t", IsFakeClient(client) ? (bHumanControlled ? "Frustrated" : "AI") : "HumanControlled", name);
 
 	if (IsPlayerAlive(client))
-		CPrintToChatAll("%t",
-				g_hCvarTopCount.IntValue ? "RemainingHealth_TopNumbered" : "RemainingHealth",
-				name,
-				info.lastHealth,
-				info.index,
-				g_hCvarTopCount.IntValue);
+		CPrintToChatAll("%t", g_hCvarTopCount.IntValue ? "RemainingHealth_TopNumbered" : "RemainingHealth", name, info.lastHealth, info.index, g_hCvarTopCount.IntValue);
 	else
-		CPrintToChatAll("%t",
-				g_hCvarTopCount.IntValue ? "DamageDealt_TopNumbered" : "DamageDealt",
-				name,
-				info.index,
-				g_hCvarTopCount.IntValue);
+		CPrintToChatAll("%t", g_hCvarTopCount.IntValue ? "DamageDealt_TopNumbered" : "DamageDealt", name, info.index, g_hCvarTopCount.IntValue);
 }
 
 void PrintTankFactsTitle(const TankInfo info)
@@ -639,10 +517,7 @@ void PrintTankFactsTitle(const TankInfo info)
 
 	Format(name, sizeof(name), "%t", IsFakeClient(client) ? (bHumanControlled ? "Frustrated" : "AI") : "HumanControlled", name);
 
-	CPrintToChatAll("%t",
-			"FactsTitle",
-			name,
-			info.index);
+	CPrintToChatAll("%t", "FactsTitle", name, info.index);
 }
 
 void PrintTankInfo(int userid = 0)
@@ -650,12 +525,10 @@ void PrintTankInfo(int userid = 0)
 	if (userid > 0)
 	{
 		PrintTankInfoInternal(userid);
-		//ClearTankInfo(userid);
 	}
 	else
 	{
 		g_aTankInfo.ForEach( PrintTankInfoInternal );
-		//ClearTankInfo();
 	}
 }
 
@@ -765,14 +638,12 @@ void PrintTankDamage(int userid)
 
 	PrintTankDamageTitle(info);
 
-	// survivor damages
 	AutoUserVector survivorVector = info.survivorInfoVector;
 	survivorVector.SortCustom( SortADT_DamageDesc );
 
 	g_iAnnounceCount = 0;
 	survivorVector.ForEach( PrintTankDamageInternal, userid );
 
-	// friendly / unknown damages
 	if (info.friendlyDamage && g_hCvarOtherSource.IntValue & OTHERSOURCE_FRIENDLY)
 	{
 		int percent = RoundToNearest(float(info.friendlyDamage) / info.maxHealth * 100.0);
@@ -802,12 +673,8 @@ bool PrintTankDamageInternal(int userid, any tankid)
 	int maxHealth;
 	g_aTankInfo.Get(tankid, maxHealth, TankInfo::maxHealth);
 
-	// TODO:
-	// Original version takes care of round up issue where sum of percentages goes over 100%.
-	// I decided to keep it simple at first but might consider a restore if it happens a lot.
 	int percent = RoundToNearest(float(info.damageDone) / maxHealth * 100.0);
 
-	// ignore cases printing zeros only
 	if (info.damageDone > 0 || (style == Style_Combined && info.damageReceived))
 	{
 		if (style == Style_Combined)
@@ -822,12 +689,14 @@ bool PrintTankDamageInternal(int userid, any tankid)
 
 void PrintTankFacts(int userid, float delay = 0.0)
 {
+	if (g_hCvarSuppressTankDamage.BoolValue)
+		return;
+
 	TankInfo info;
 	g_aTankInfo.GetArray(userid, info);
 
 	if (delay > 0.0)
 	{
-		//info.aliveSince += delay;
 		info.survivorInfoVector = view_as<AutoUserVector>(info.survivorInfoVector.Clone());
 
 		DataPack dp;
@@ -840,7 +709,6 @@ void PrintTankFacts(int userid, float delay = 0.0)
 
 		dp.WriteString(controlName);
 		dp.WriteCell(IsFakeClient(client));
-		//dp.WriteCell(IsPlayerAlive(client));
 		dp.WriteCell(bHumanControlled);
 		dp.WriteCell(info.index);
 		dp.WriteFloat(delay);
@@ -856,6 +724,9 @@ void PrintTankFacts(int userid, float delay = 0.0)
 
 Action Timer_PrintTankFacts(Handle timer, DataPack dp)
 {
+	if (g_hCvarSuppressTankDamage.BoolValue)
+		return Plugin_Stop;
+
 	dp.Reset();
 
 	TankInfo info;
@@ -864,7 +735,6 @@ Action Timer_PrintTankFacts(Handle timer, DataPack dp)
 	char name[MAX_NAME_LENGTH];
 	dp.ReadString(name, sizeof(name));
 	bool bAI = dp.ReadCell();
-	//bool bAlive = dp.ReadCell();
 	bool bHumanControlled = dp.ReadCell();
 	int tankindex = dp.ReadCell();
 	float delay  = dp.ReadFloat();
@@ -872,10 +742,7 @@ Action Timer_PrintTankFacts(Handle timer, DataPack dp)
 
 	Format(name, sizeof(name), "%t", bAI ? (bHumanControlled ? "Frustrated" : "AI") : "HumanControlled", name);
 
-	CPrintToChatAll("%t",
-			"FactsTitle",
-			name,
-			tankindex);
+	CPrintToChatAll("%t", "FactsTitle", name, tankindex);
 
 	PrintTankFactsInternal(info, delay);
 
@@ -886,6 +753,9 @@ Action Timer_PrintTankFacts(Handle timer, DataPack dp)
 
 void PrintTankFactsInternal(const TankInfo info, float delay)
 {
+	if (g_hCvarSuppressTankDamage.BoolValue)
+		return;
+
 	AutoUserVector survivorVector = info.survivorInfoVector;
 
 	int total_punch = survivorVector.Sum(SurvivorInfo::punch);
@@ -897,11 +767,6 @@ void PrintTankFactsInternal(const TankInfo info, float delay)
 
 	int iAliveDuration = RoundToFloor(GetGameTime() - info.aliveSince - delay - 0.1);
 
-	// [!] Facts of the Tank (AI)
-	// > Punch: 4 / Rock: 2 / Hittable: 0
-	// > Incap: 1 / Death: 0 from Survivors
-	// > Duration: 1min 7s / Total Damage: 144
-
 	CPrintToChatAll("%t", "Announce_TankAttack", total_punch, total_rock, total_hittable);
 	CPrintToChatAll("%t", "Announce_AttackResult", total_incap, total_death);
 	if (iAliveDuration > 60)
@@ -910,7 +775,7 @@ void PrintTankFactsInternal(const TankInfo info, float delay)
 		CPrintToChatAll("%t", "Announce_Summary_WithoutMinute", iAliveDuration, total_damage);
 }
 
-// utilize our map g_smUserNames
+
 bool GetClientNameFromUserId(int userid, char[] name, int maxlen)
 {
 	int client = GetClientOfUserId(userid);
@@ -950,9 +815,6 @@ int SortADT_DamageDesc(int index1, int index2, Handle array, Handle hndl)
 	return 0;
 }
 
-/**
- * Thanks to @nikita1824 for wrtting
- */
 any Native_Punches(Handle hPlugin, int iNumParams) {
 	int client = GetNativeCell(1);
 	if (client <= 0 || client > MaxClients)
@@ -1032,7 +894,6 @@ stock void LoadPluginTranslations(const char[] file)
 	LoadTranslations(file);
 }
 
-// xref: OnClientDisconnect, Event_PlayerKilled
 Action Timer_CheckTank(Handle timer, int userid)
 {
 	int client = GetClientOfUserId(userid);
