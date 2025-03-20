@@ -1,0 +1,1 @@
+A sort of fix for this plugin regarding passing Tank, should fix the issue causing Rock selection to not work to passed players.
