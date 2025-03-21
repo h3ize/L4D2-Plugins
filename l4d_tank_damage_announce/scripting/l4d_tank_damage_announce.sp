@@ -243,12 +243,6 @@ void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 	g_aTankInfo.Set(userid, g_iTankIndex, TankInfo::index);
 
 	UpdateTankHealth(client);
-
-	// Check the ConVar and suppress tank damage messages if needed
-	if (g_hCvarSuppressTankDamage.BoolValue)
-	{
-		PrintToChatAll("Tank damage messages are suppressed for this Tank.");
-	}
 }
 
 void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
