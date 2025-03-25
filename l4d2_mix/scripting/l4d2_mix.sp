@@ -64,9 +64,9 @@ public Plugin myinfo =
 {
     name = "L4D2 Mix Manager",
     author = "Luckylock, Sir, heize",
-    description = "Provides ability to pick captains and teams through menus",
-    version = "6.5",
-    url = "https://github.com/h3ize"
+    description = "Provides ability to pick captains and teams through menus. Improved to support team mode.",
+    version = "6",
+    url = "https://github.com/LuckyServ/"
 };
 
 public void OnPluginStart()
