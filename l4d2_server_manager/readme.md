@@ -1,1 +1,0 @@
-Based on an old plugin I had deobfuscated long ago. A remake to automatically restart servers.

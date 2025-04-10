@@ -1,0 +1,1 @@
+Credits to Solaris for this plugin. I simply created an external script to automatically restart servers with it.
