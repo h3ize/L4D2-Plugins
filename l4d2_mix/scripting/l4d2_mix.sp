@@ -65,7 +65,7 @@ public Plugin myinfo =
     name = "L4D2 Mix Manager",
     author = "Luckylock, Sir, heize",
     description = "Provides ability to pick captains and teams through menus. Improved to support team mode.",
-    version = "6",
+    version = "6.1",
     url = "https://github.com/LuckyServ/"
 };
 
@@ -252,9 +252,10 @@ Action Cmd_MixStart(int client, int args)
         PrintToChat(client, "\x04Mix Manager: \x01You already voted to start a Mix.");
 
     } else if (mixConditions == COND_NO_PLAYERS) {
+        int currentPlayerCount = GetTrieSize(hPlayers);
+        PrintToChat(client, "\x04Mix Manager: \x01Can't start a mix, not enough players (%d/%d)", currentPlayerCount, iSurvivorLimit * 2);
         PrintToChat(client, "\x04Mix Manager: \x01Join teams to start a mix.");
     }
-
     return Plugin_Handled;
 }
 
