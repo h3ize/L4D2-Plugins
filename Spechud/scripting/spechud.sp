@@ -288,7 +288,6 @@ void UpdateSpecHudBasedOnConVar()
 }
 
 
-
 public void GameConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     GetGameCvars();
@@ -525,7 +524,7 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     }
     else if (team == L4D2Team_Spectator)
     {
-        if (auto_enable_spechud.BoolValue)
+        if (auto_enable_spechud.BoolValue && IsClientCaster(client))
         {
             bSpecHudActive[client] = bSpecHudPersistent[client]; // Use persistent HUD state
         }
@@ -534,8 +533,6 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
             bSpecHudActive[client] = false;
         }
     }
-
-    //if (team == 3) storedClass[client] = ZC_None;
 }
 
 /**********************************************************************************************/
