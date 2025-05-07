@@ -19,6 +19,7 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 #include <l4d_tank_damage_announce>
+#include <caster_system>
 #include <autoexecconfig>
 
 /**
@@ -101,7 +102,7 @@ bool bStaticTank, bStaticWitch;
 // Hud Toggle & Hint Message
 bool bSpecHudActive[MAXPLAYERS+1], bTankHudActive[MAXPLAYERS+1];
 bool bSpecHudHintShown[MAXPLAYERS+1], bTankHudHintShown[MAXPLAYERS+1];
-bool bSpecHudPersistent[MAXPLAYERS+1]; // New array to store persistent HUD state
+bool bSpecHudPersistent[MAXPLAYERS+1]; 
 
 /**********************************************************************************************/
 
@@ -119,11 +120,10 @@ public void OnPluginStart()
     (sv_maxplayers = FindConVar("sv_maxplayers")).AddChangeHook(GameConVarChanged);
     (tank_burn_duration = FindConVar("tank_burn_duration")).AddChangeHook(GameConVarChanged);
 
-    auto_enable_spechud = AutoExecConfig_CreateConVar("auto_enable_spechud", "0", "Automatically enable spechud for spectators", FCVAR_NONE);
+    auto_enable_spechud = AutoExecConfig_CreateConVar("auto_enable_spechud", "1", "Automatically enable spechud for Casters", FCVAR_NONE);
     if (auto_enable_spechud != null)
     {
         auto_enable_spechud.AddChangeHook(GameConVarChanged);
-        // Enable or disable spechud based on the initial value of auto_enable_spechud
         UpdateSpecHudBasedOnConVar();
     }
 
@@ -265,9 +265,13 @@ void UpdateSpecHudBasedOnConVar()
     {
         for (int i = 1; i <= MaxClients; ++i)
         {
-            if (IsClientInGame(i) && GetClientTeam(i) == L4D2Team_Spectator)
+            if (IsClientInGame(i) && GetClientTeam(i) == L4D2Team_Spectator && IsClientCaster(i))
             {
-                bSpecHudActive[i] = bSpecHudPersistent[i]; // Use persistent HUD state
+                bSpecHudActive[i] = bSpecHudPersistent[i];
+            }
+            else
+            {
+                bSpecHudActive[i] = false;
             }
         }
     }
@@ -282,6 +286,8 @@ void UpdateSpecHudBasedOnConVar()
         }
     }
 }
+
+
 
 public void GameConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
