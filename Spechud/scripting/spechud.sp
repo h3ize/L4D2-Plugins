@@ -27,7 +27,7 @@
  * 2. Enabled spechud automatically, when tank spawns, disabled it for tankhud, on tank's death, re enable it until a spectator does !spechud to turn off. Added a cvar to toggle between automatically enabling or disabling.
  */
 
-#define PLUGIN_VERSION	"3.8.4-2025/2/07"
+#define PLUGIN_VERSION	"3.8.6-2025/5/09"
 
 public Plugin myinfo =
 {
@@ -288,6 +288,7 @@ void UpdateSpecHudBasedOnConVar()
 }
 
 
+
 public void GameConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     GetGameCvars();
@@ -482,29 +483,33 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("userid"));
-	if (!client || !IsInfected(client)) return;
-	if (GetInfectedClass(client) == L4D2Infected_Tank)
-	{
-		if (iTankCount > 0) iTankCount--;
-		if (!RoundHasFlowTank()) bFlowTankActive = false;
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!client || !IsInfected(client)) return;
 
-		// Disable spechud for the tank when it dies
-		bSpecHudActive[client] = false;
+    if (GetInfectedClass(client) == L4D2Infected_Tank)
+    {
+        if (iTankCount > 0) iTankCount--;
+        if (!RoundHasFlowTank()) bFlowTankActive = false;
 
-		// Re-enable spechud for spectators only if auto_enable_spechud is true
-		if (auto_enable_spechud.BoolValue)
-		{
-			for (int i = 1; i <= MaxClients; ++i)
-			{
-				if (GetClientTeam(i) == L4D2Team_Spectator)
-				{
-					bSpecHudActive[i] = bSpecHudPersistent[i]; // Use persistent HUD state
-				}
-			}
-		}
-	}
+        // Disable spechud for the tank when it dies
+        bSpecHudActive[client] = false;
+
+        // Re-enable spechud for spectators only if auto_enable_spechud is true
+        if (auto_enable_spechud.BoolValue)
+        {
+            for (int i = 1; i <= MaxClients; ++i)
+            {
+                if (GetClientTeam(i) == L4D2Team_Spectator && IsClientCaster(i))
+                {
+                    bSpecHudActive[i] = true; // Explicitly enable spechud for casters
+                    bSpecHudPersistent[i] = true; // Update persistent HUD state
+                }
+            }
+        }
+    }
 }
+
+
 public void Event_WitchDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	if (iWitchCount > 0) iWitchCount--;
@@ -524,7 +529,7 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     }
     else if (team == L4D2Team_Spectator)
     {
-        if (auto_enable_spechud.BoolValue && IsClientCaster(client))
+        if (auto_enable_spechud.BoolValue)
         {
             bSpecHudActive[client] = bSpecHudPersistent[client]; // Use persistent HUD state
         }
@@ -533,6 +538,8 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
             bSpecHudActive[client] = false;
         }
     }
+
+    //if (team == 3) storedClass[client] = ZC_None;
 }
 
 /**********************************************************************************************/
