@@ -1,0 +1,1 @@
+Simply as the name says. Ripped this baby from Caster System plugin to make it a seperate plugin. Thanks CanadaRox & Forgetest
