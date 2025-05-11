@@ -19,15 +19,15 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 #include <l4d_tank_damage_announce>
-#include <caster_system>
 #include <autoexecconfig>
+#include <caster_system>
 
 /**
  * 1. tankhud 增加 Punches, Rocks, Props, Total Damage, alive Time:
  * 2. Enabled spechud automatically, when tank spawns, disabled it for tankhud, on tank's death, re enable it until a spectator does !spechud to turn off. Added a cvar to toggle between automatically enabling or disabling.
  */
 
-#define PLUGIN_VERSION	"3.8.6-2025/5/09"
+#define PLUGIN_VERSION	"3.9.0-2025/5/11"
 
 public Plugin myinfo =
 {
@@ -71,7 +71,7 @@ float fVersusBossBuffer, fTankBurnDuration;
 
 // Plugin Cvar
 ConVar l4d_tank_percent, l4d_witch_percent, hServerNamer, l4d_ready_cfg_name;
-ConVar auto_enable_spechud; // New ConVar to control auto-enabling of spechud
+ConVar auto_enable_spechud;
 
 // Plugin Var
 char sReadyCfgName[64], sHostname[64];
@@ -102,7 +102,7 @@ bool bStaticTank, bStaticWitch;
 // Hud Toggle & Hint Message
 bool bSpecHudActive[MAXPLAYERS+1], bTankHudActive[MAXPLAYERS+1];
 bool bSpecHudHintShown[MAXPLAYERS+1], bTankHudHintShown[MAXPLAYERS+1];
-bool bSpecHudPersistent[MAXPLAYERS+1]; 
+bool bSpecHudPersistent[MAXPLAYERS+1];
 
 /**********************************************************************************************/
 
@@ -120,7 +120,7 @@ public void OnPluginStart()
     (sv_maxplayers = FindConVar("sv_maxplayers")).AddChangeHook(GameConVarChanged);
     (tank_burn_duration = FindConVar("tank_burn_duration")).AddChangeHook(GameConVarChanged);
 
-    auto_enable_spechud = AutoExecConfig_CreateConVar("auto_enable_spechud", "1", "Automatically enable spechud for Casters", FCVAR_NONE);
+    auto_enable_spechud = AutoExecConfig_CreateConVar("auto_enable_spechud", "1", "Automatically enable spechud for casting spectators.", FCVAR_NONE);
     if (auto_enable_spechud != null)
     {
         auto_enable_spechud.AddChangeHook(GameConVarChanged);
@@ -267,11 +267,7 @@ void UpdateSpecHudBasedOnConVar()
         {
             if (IsClientInGame(i) && GetClientTeam(i) == L4D2Team_Spectator && IsClientCaster(i))
             {
-                bSpecHudActive[i] = bSpecHudPersistent[i];
-            }
-            else
-            {
-                bSpecHudActive[i] = false;
+                bSpecHudActive[i] = bSpecHudPersistent[i]; // Use persistent HUD state
             }
         }
     }
@@ -287,13 +283,10 @@ void UpdateSpecHudBasedOnConVar()
     }
 }
 
-
-
 public void GameConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     GetGameCvars();
 
-    // Handle auto_enable_spechud change
     if (convar == auto_enable_spechud)
     {
         UpdateSpecHudBasedOnConVar();
@@ -483,33 +476,29 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    if (!client || !IsInfected(client)) return;
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (!client || !IsInfected(client)) return;
+	if (GetInfectedClass(client) == L4D2Infected_Tank)
+	{
+		if (iTankCount > 0) iTankCount--;
+		if (!RoundHasFlowTank()) bFlowTankActive = false;
 
-    if (GetInfectedClass(client) == L4D2Infected_Tank)
-    {
-        if (iTankCount > 0) iTankCount--;
-        if (!RoundHasFlowTank()) bFlowTankActive = false;
+		// Disable spechud for the tank when it dies
+		bSpecHudActive[client] = false;
 
-        // Disable spechud for the tank when it dies
-        bSpecHudActive[client] = false;
-
-        // Re-enable spechud for spectators only if auto_enable_spechud is true
-        if (auto_enable_spechud.BoolValue)
-        {
-            for (int i = 1; i <= MaxClients; ++i)
-            {
-                if (GetClientTeam(i) == L4D2Team_Spectator && IsClientCaster(i))
-                {
-                    bSpecHudActive[i] = true; // Explicitly enable spechud for casters
-                    bSpecHudPersistent[i] = true; // Update persistent HUD state
-                }
-            }
-        }
-    }
+		// Re-enable spechud for spectators only if auto_enable_spechud is true
+		if (auto_enable_spechud.BoolValue)
+		{
+			for (int i = 1; i <= MaxClients; ++i)
+			{
+				if (GetClientTeam(i) == L4D2Team_Spectator && IsClientCaster(i))
+				{
+					bSpecHudActive[i] = bSpecHudPersistent[i]; // Use persistent HUD state
+				}
+			}
+		}
+	}
 }
-
-
 public void Event_WitchDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	if (iWitchCount > 0) iWitchCount--;
@@ -529,7 +518,7 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     }
     else if (team == L4D2Team_Spectator)
     {
-        if (auto_enable_spechud.BoolValue)
+        if (auto_enable_spechud.BoolValue && IsClientCaster(client))
         {
             bSpecHudActive[client] = bSpecHudPersistent[client]; // Use persistent HUD state
         }
@@ -1328,7 +1317,7 @@ void FillGameInfo(Panel hSpecHud)
 /**
  *	Datamap m_iAmmo
  *	offset to add - gun(s) - control cvar
- *	
+ *
  *	+12: M4A1, AK74, Desert Rifle, also SG552 - ammo_assaultrifle_max
  *	+20: both SMGs, also the MP5 - ammo_smg_max
  *	+28: both Pump Shotguns - ammo_shotgun_max
