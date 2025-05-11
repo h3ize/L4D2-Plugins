@@ -58,7 +58,7 @@ public Plugin myinfo =
 	name		= "AFK on Readyup",
 	author		= "lechuga, heize",
 	description = "Manage AFK players in the readyup",
-	version		= "1.1.5",
+	version		= "1.1.6",
 	url			= "https://github.com/lechuga16/AFK-on-readyup"
 };
 
@@ -314,8 +314,7 @@ void StartKickTimer(int iClient) {
         return;
     }
 
-    if (g_hKickTimer[iClient] != null)
-        delete g_hKickTimer[iClient];
+    SafeDeleteHandle(g_hKickTimer[iClient]);
 
     g_hKickTimer[iClient] = CreateTimer(g_cvarKickDelay.FloatValue, Timer_KickPlayer, GetClientUserId(iClient));
 }
@@ -404,7 +403,6 @@ public void OnClientPutInServer(int client) {
     }
 }
 
-
 public Action Cmd_AFKs(client, args) {
 	int iTime = GetTime();
 	for (int i = 1; i <= MaxClients; i++) {
@@ -472,13 +470,7 @@ void ResetTimers(int iClient, bool bCheckTeam = true)
     g_iLastActivity[iClient] = GetTime();
 
     // Cancel kick timer if player became active after being moved to spectator
-    if (g_hKickTimer[iClient] != null)
-    {
-        PrintDebug("Deleting kick timer for client %d", iClient);
-        delete g_hKickTimer[iClient];
-        g_hKickTimer[iClient] = null;
-        PrintDebug("Cancelled kick timer for client %d due to activity", iClient);
-    }
+    SafeDeleteHandle(g_hKickTimer[iClient]);
 
     // Restart the kick timer if the player is in spectator mode and shows activity
     if (L4D_GetClientTeam(iClient) == L4DTeam_Spectator && g_cvarKickDelay.FloatValue > 0.0)
@@ -487,6 +479,19 @@ void ResetTimers(int iClient, bool bCheckTeam = true)
     }
 }
 
+/**
+ * Safely deletes a handle.
+ *
+ * @param h The handle to delete.
+ */
+void SafeDeleteHandle(Handle &h)
+{
+    if (h != null && IsValidHandle(h))
+    {
+        delete h;
+        h = null;
+    }
+}
 
 /**
  * Check if the translation file exists
