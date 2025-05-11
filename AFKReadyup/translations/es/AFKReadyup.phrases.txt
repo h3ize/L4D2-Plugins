@@ -1,0 +1,23 @@
+"Phrases"
+{
+    "Tag"
+    {
+        "es"    "[{olive}AFK{default}]"
+    }
+    "Footer"
+    {
+        "es"    "Anti-AFK: %d seg(s)"
+    }
+    "ShowTimer"
+    {
+        "es"    "Tienes {red}%d{default}s para estar listo (Presiona {green}F1{default} o escribe {green}!ready{default})"
+    }
+    "MoveToSpec"
+    {
+        "es"    "{blue}%N{default} fue movido a {green}espectador{default} por estar AFK demasiado tiempo."
+    }
+    "KickMessage"
+    {
+        "es"    "{blue}%s{default} fue expulsado por estar AFK demasiado tiempo."
+    }
+}
