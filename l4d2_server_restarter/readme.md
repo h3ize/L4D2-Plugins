@@ -1,0 +1,1 @@
+A simpler version of l4d2_auto_restarter which just restarts servers when empty.
