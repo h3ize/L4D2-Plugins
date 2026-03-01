@@ -7,6 +7,9 @@
 #define PLUGIN_VERSION "3.3-2025/7/29"
 #define DEBUG 0
 
+Handle g_hRestartCheckTimer;
+bool g_bMapTransitioning = false;
+
 public Plugin myinfo =
 {
     name = "[L4D1/L4D2/Any] auto restart",
@@ -55,6 +58,7 @@ public void OnPluginStart()
     HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
     HookEvent("versus_match_finished", Event_MatchEnd);
     HookEvent("finale_vehicle_leaving", Event_MatchEnd);
+    HookEvent("map_transition", Event_MapTransition, EventHookMode_PostNoCopy);
 
     RegAdminCmd("sm_crash", Cmd_RestartServer, ADMFLAG_ROOT);
     RegAdminCmd("sm_rs", Cmd_ImmediateRestartServer, ADMFLAG_ROOT);
@@ -71,6 +75,17 @@ public void OnPluginEnd()
 void ConVarChanged_Hibernate(ConVar cvar, const char[] oldVal, const char[] newVal)
 {
     g_hConVarHibernate.SetBool(false);
+}
+
+public void Event_MapTransition(Event event, const char[] name, bool dontBroadcast)
+{
+	g_bMapTransitioning = true;
+	LogToFileEx(g_sPath, "Map transition detected — suppressing auto restart.");
+}
+
+public void OnMapStart()
+{
+	g_bMapTransitioning = false;
 }
 
 public void OnMapEnd()
@@ -152,35 +167,44 @@ void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
 
 Action Timer_COLD_DOWN(Handle timer, any data)
 {
-    COLD_DOWN_Timer = null;
+	COLD_DOWN_Timer = null;
 
-    // Defer restart while Heizepugs match is active
-    if (IsHeizepugsMatchActive())
-    {
-        LogToFileEx(g_sPath, "Heizepugs match active — deferring auto restart.");
-        COLD_DOWN_Timer = CreateTimer(30.0, Timer_COLD_DOWN);
-        return Plugin_Continue;
-    }
+	if (g_bMapTransitioning)
+	{
+		LogToFileEx(g_sPath, "AutoRestart blocked: map is transitioning.");
+		return Plugin_Continue;
+	}
 
-    if (CheckPlayerInGame(0))
-    {
-        g_bNoOneInServer = false;
-        return Plugin_Continue;
-    }
+	// Defer restart while Heizepugs match is active
+	if (IsHeizepugsMatchActive())
+	{
+		LogToFileEx(g_sPath, "Heizepugs match active! Deferring auto restart.");
+		COLD_DOWN_Timer = CreateTimer(30.0, Timer_COLD_DOWN);
+		return Plugin_Continue;
+	}
 
-    if (g_bFinaleWaitingForDisconnect)
-        LogToFileEx(g_sPath, "Match/finale ended and all players left. Restarting.");
-    else
-        LogToFileEx(g_sPath, "Server became empty during play. Restarting.");
+	if (CheckPlayerInGame(0))
+	{
+		g_bNoOneInServer = false;
+		return Plugin_Continue;
+	}
 
-    PrintToServer("AutoRestart: Server is restarting.");
-    UnloadAccelerator();
-    CreateTimer(0.1, Timer_RestartServer);
+	if (g_bFinaleWaitingForDisconnect)
+		LogToFileEx(g_sPath, "Match/finale ended and all players left. Restarting.");
+	else
+		LogToFileEx(g_sPath, "Server became empty during play. Restarting.");
 
-    g_bNoOneInServer = false;
-    g_bFinaleWaitingForDisconnect = false;
+	PrintToServer("AutoRestart: Server is restarting.");
+	UnloadAccelerator();
+	CreateTimer(0.1, Timer_RestartServer);
 
-    return Plugin_Continue;
+	delete g_hRestartCheckTimer;
+	g_hRestartCheckTimer = CreateTimer(15.0, Timer_CheckRestartFailed);
+
+	g_bNoOneInServer = false;
+	g_bFinaleWaitingForDisconnect = false;
+
+	return Plugin_Continue;
 }
 
 Action Timer_RestartServer(Handle timer)
@@ -245,6 +269,60 @@ Action ServerCmd_map(int client, const char[] command, int argc)
     g_hConVarHibernate.SetBool(false);
     delete COLD_DOWN_Timer;
     return Plugin_Continue;
+}
+
+void GetRestartFailReason(char[] buffer, int maxlen)
+{
+	bool hasCrash = CommandExists("crash");
+	bool hasSvCrash = CommandExists("sv_crash");
+
+	int flags = hasCrash ? GetCommandFlags("crash") : 0;
+	bool cheatBlocked = hasCrash && (flags & FCVAR_CHEAT);
+
+	bool acceleratorLoaded = false;
+	char extbuf[4096];
+	ServerCommandEx(extbuf, sizeof(extbuf), "sm exts list");
+
+	Regex regex = new Regex("\\[([0-9]+)\\] Accelerator");
+	if (regex.Match(extbuf) > 0)
+		acceleratorLoaded = true;
+	delete regex;
+
+	if (!hasCrash && !hasSvCrash)
+	{
+		strcopy(buffer, maxlen, "No crash command available");
+		return;
+	}
+
+	if (cheatBlocked)
+	{
+		strcopy(buffer, maxlen, "crash command is FCVAR_CHEAT");
+		return;
+	}
+
+	if (acceleratorLoaded)
+	{
+		strcopy(buffer, maxlen, "Accelerator extension still loaded");
+		return;
+	}
+
+	strcopy(buffer, maxlen, "Unknown (engine ignored crash)");
+}
+
+Action Timer_CheckRestartFailed(Handle timer)
+{
+	g_hRestartCheckTimer = null;
+
+	if (!CheckPlayerInGame(0))
+	{
+		char reason[128];
+		GetRestartFailReason(reason, sizeof(reason));
+
+		LogToFileEx(g_sPath, "ERROR: AutoRestart failed (%s)", reason);
+		PrintToServer("ERROR: AutoRestart failed (%s)", reason);
+	}
+
+	return Plugin_Continue;
 }
 
 bool IsHeizepugsMatchActive()
