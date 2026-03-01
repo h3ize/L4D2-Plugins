@@ -1,0 +1,19 @@
+"Phrases"
+{
+    "KickBlocked"
+    {
+        "#format"   "{1:N}"
+        "en"        "{default}[{green}!{default}] You cannot vote kick {olive}{1}{default}. They are a {green}protected user{default}!"
+    }
+
+    "KickAttempted"
+    {
+        "#format"   "{1:N}"
+        "en"        "{default}[{green}!{default}] {olive}{1}{default} attempted to kick you!"
+    }
+
+    "NotConsoleVote"
+    {
+        "en"        "{default}[{green}!{default}] You must be in-game to use votekick."
+    }
+}
